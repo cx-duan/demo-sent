@@ -11,6 +11,8 @@ File contains:
 Streamlit App:
 https://cx-duan-demo-sent-sentiment-entity-overview-dqspnq.streamlitapp.com/
 
+<img width="1138" alt="image" src="https://user-images.githubusercontent.com/57568318/198199829-48215e8c-0085-46af-ba6c-0232d931aec0.png">
+
 
 ## To Run:
 
