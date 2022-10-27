@@ -23,6 +23,12 @@ To run app via StreamLit:
 python3 -m streamlit run sentiment-entity-overview.py 
 
 
+## Import Libraries
+pip3 install streamlit
+pip3 install pandas
+pip3 install numpy
+pip3 install plotly
+
 #Need to add ability to upload own file.
 
 
