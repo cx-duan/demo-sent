@@ -4,6 +4,17 @@ import json
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+from save_audio import save_audio
+from configure import auth_key
+
+transcript_endpoint = "https://api.assemblyai.com/v2/transcript"
+upload_endpoint = 'https://api.assemblyai.com/v2/upload'
+
+headers_auth_only = {'authorization': auth_key}
+headers = {
+   "authorization": auth_key,
+   "content-type": "application/json"
+}
 
 #JSON file read. Can be replaced with upload
 with open('response.json', 'r') as transcript_json:
@@ -11,6 +22,8 @@ with open('response.json', 'r') as transcript_json:
 
 # Results for entities and sentiment returned from JSON file read
 sentiment_analysis_results = transcript_data['sentiment_analysis_results']
+transcript = transcript_data['text']
+
 entities = transcript_data['entities']
 
 # Dictionary to translate sentiment values to -1, 0 , 1 to calculate sentiment later
@@ -66,30 +79,55 @@ for i in sent_ent:
     if l > 0:
         avg = s / l
         avg_sent_ent[i] = avg
+def categorize_sentiment(avg_sent_ent):
+    result = {}
+    for i in avg_sent_ent:
+        sentiment = "neutral"
+        if avg_sent_ent[i] < 0:
+            sentiment = "negative"
+            if avg_sent_ent[i] < -0.5:
+                sentiment = "very negative"
+        elif avg_sent_ent[i] > 0:
+            sentiment = "positive"
+            if avg_sent_ent[i] < 0.5:
+                sentiment = "very positive"
+        result[i] = sentiment
+    return result
+
 # Add the sentiment value to the dictionary based on if the average sentiment value is >0, <0, =0
 sent_and_label = {}
 sentences = []
 for i in avg_sent_ent:
-    sentiment = "neutral"
-    if avg_sent_ent[i] < 0:
-        sentiment = "negative"
-        if avg_sent_ent[i] < -0.5:
-            sentiment = "very negative"
-    elif avg_sent_ent[i] > 0:
-        sentiment = "positive"
-        if avg_sent_ent[i] < 0.5:
-            sentiment = "very positive"
+    sentiment_dict = categorize_sentiment({i: avg_sent_ent[i]})
+    sentiment = sentiment_dict[i]
     
     sent_and_label[i] = {
         "sentiment_value": avg_sent_ent[i],
         "sentiment": sentiment
     }
     sentences.append("%s has a %s sentiment" % (i, sentiment))
+print(sentences)
+
+total = sum(avg_sent_ent.values())
+total_avg_sent = total / len(avg_sent_ent)
+
+# Categorize the overall sentiment
+overall_sentiment_dict = categorize_sentiment({"Overall": total_avg_sent})
+overall_sentiment = overall_sentiment_dict["Overall"]
+
+# Print the overall sentiment
+print("The overall sentiment is %s with an average sentiment value of %.2f" % (overall_sentiment, total_avg_sent))
+
 
 #Streamlit Frontend
 #App description
 st.title('Sentiment analysis overview')
-# st.subheader('Demo Day')
+st.caption("This is a Sentiment Analysis on your chosen audio file using AssemblyAI's API")
+
+# Display transcript
+print('creating transcript')
+st.sidebar.header('Transcript of the earnings call')
+st.sidebar.markdown(transcript)
 
 #convert json to dataframe
 sen_df = pd.DataFrame(sentiment_analysis_results)
@@ -134,3 +172,56 @@ col1.plotly_chart(fig)
 with col2:
     for i in sentences:
         st.markdown("- " + i)
+
+pos_perc = grouped[grouped['sentiment']=='POSITIVE']['count'].iloc[0]*100/sen_df.shape[0]
+neg_perc = grouped[grouped['sentiment']=='NEGATIVE']['count'].iloc[0]*100/sen_df.shape[0]
+neu_perc = grouped[grouped['sentiment']=='NEUTRAL']['count'].iloc[0]*100/sen_df.shape[0]
+
+sentiment_score = neu_perc+pos_perc-neg_perc
+
+fig = go.Figure()
+
+fig.add_trace(go.Indicator(
+    mode = "delta",
+    value = sentiment_score,
+    domain = {'row': 1, 'column': 1}))
+
+fig.update_layout(
+	template = {'data' : {'indicator': [{
+        'title': {'text': "Sentiment score"},
+        'mode' : "number+delta+gauge",
+        'delta' : {'reference': 50}}]
+                         }},
+    autosize=False,
+    width=400,
+    height=500,
+    margin=dict(
+        l=20,
+        r=50,
+        b=50,
+        pad=4
+    )
+)
+
+col2.plotly_chart(fig)
+
+## Display negative sentence locations
+fig = px.scatter(sentiment_analysis_results, y='sentiment', color='sentiment', size='confidence', hover_data=['text'], color_discrete_map={"NEGATIVE":"firebrick","NEUTRAL":"navajowhite","POSITIVE":"darkgreen"})
+
+
+fig.update_layout(
+	showlegend=False,
+    autosize=False,
+    width=800,
+    height=300,
+    margin=dict(
+        l=50,
+        r=50,
+        b=50,
+        t=50,
+        pad=4
+    )
+)
+
+st.plotly_chart(fig)
+
