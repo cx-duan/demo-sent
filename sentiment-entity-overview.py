@@ -6,6 +6,11 @@ import plotly.graph_objects as go
 import numpy as np
 from save_audio import save_audio
 from configure import auth_key
+import requests
+from urllib.request import urlopen
+from bs4 import BeautifulSoup
+from time import sleep
+
 
 transcript_endpoint = "https://api.assemblyai.com/v2/transcript"
 upload_endpoint = 'https://api.assemblyai.com/v2/upload'
@@ -124,6 +129,55 @@ print("The overall sentiment is %s with an average sentiment value of %.2f" % (o
 st.title('Sentiment analysis overview')
 st.caption("This is a Sentiment Analysis on your chosen audio file using AssemblyAI's API")
 
+# Get link from user
+# video_url = st.text_input(label='Earnings call link', value="https://www.youtube.com/watch?v=UA-ISgpgGsk")
+
+# # Save audio locally
+# save_location = save_audio(video_url)
+
+# ## Upload audio to AssemblyAI
+# CHUNK_SIZE = 5242880
+
+# def read_file(filename):
+# 	with open(filename, 'rb') as _file:
+# 		while True:
+# 			data = _file.read(CHUNK_SIZE)
+# 			if not data:
+# 				break
+# 			yield data
+
+# upload_response = requests.post(
+# 	upload_endpoint,
+# 	headers=headers_auth_only, data=read_file(save_location)
+# )
+
+# audio_url = upload_response.json()['upload_url']
+# print('Uploaded to', audio_url)
+
+# ## Start transcription job of audio file
+# data = {
+# 	'audio_url': audio_url,
+# 	'sentiment_analysis': 'True',
+# }
+
+# transcript_response = requests.post(transcript_endpoint, json=data, headers=headers)
+# print(transcript_response)
+
+# transcript_id = transcript_response.json()['id']
+# polling_endpoint = transcript_endpoint + "/" + transcript_id
+
+# print("Transcribing at", polling_endpoint)
+
+# ## Waiting for transcription to be done
+# status = 'submitted'
+# while status != 'completed':
+# 	print('not ready yet')
+# 	sleep(1)
+# 	polling_response = requests.get(polling_endpoint, headers=headers)
+# 	transcript = polling_response.json()['text']
+# 	status = polling_response.json()['status']
+	
+
 # Display transcript
 print('creating transcript')
 st.sidebar.header('Transcript of the earnings call')
@@ -131,6 +185,14 @@ st.sidebar.markdown(transcript)
 
 #convert json to dataframe
 sen_df = pd.DataFrame(sentiment_analysis_results)
+
+## Get the title of this video
+# with urlopen(video_url) as url:
+#     s = url.read()
+#     soup = BeautifulSoup(s)
+#     title = soup.title.string
+
+# st.header(title)
 
 #sum sentiment to run calculations
 positive_sum = (sen_df['sentiment'] == 'POSITIVE').sum()
@@ -146,8 +208,8 @@ st.markdown("### Number of sentences: " + str(data_total_count))
 grouped = pd.DataFrame(sen_df['sentiment'].value_counts()).reset_index()
 grouped.columns = ['sentiment','count']
 
-#set 2 columns
-col1, col2 = st.columns(2)
+#set 3 columns
+col1, col2, col3 = st.columns(3)
 
 #pie graph
 fig = px.pie(grouped, values='count', names='sentiment',color='sentiment', color_discrete_map={"NEGATIVE":"#D96098","NEUTRAL":"#5584AC","POSITIVE":"#95D1CC"}, title='<span style="font-size: 34px;">Pie Chart') 
@@ -167,11 +229,6 @@ fig.update_layout(
     )
 )
 col1.plotly_chart(fig)
-
-#list sentiment list as bullet points
-with col2:
-    for i in sentences:
-        st.markdown("- " + i)
 
 pos_perc = grouped[grouped['sentiment']=='POSITIVE']['count'].iloc[0]*100/sen_df.shape[0]
 neg_perc = grouped[grouped['sentiment']=='NEGATIVE']['count'].iloc[0]*100/sen_df.shape[0]
@@ -203,7 +260,7 @@ fig.update_layout(
     )
 )
 
-col2.plotly_chart(fig)
+col3.plotly_chart(fig)
 
 ## Display negative sentence locations
 fig = px.scatter(sentiment_analysis_results, y='sentiment', color='sentiment', size='confidence', hover_data=['text'], color_discrete_map={"NEGATIVE":"firebrick","NEUTRAL":"navajowhite","POSITIVE":"darkgreen"})
@@ -224,4 +281,10 @@ fig.update_layout(
 )
 
 st.plotly_chart(fig)
+
+#list sentiment list as bullet points
+with st.expander("Entity Sentiment List",True):
+    for i in sentences:
+        st.write("- " + i)
+
 
