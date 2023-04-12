@@ -4,7 +4,7 @@ import json
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
-from save_audio import save_audio
+import util
 from configure import auth_key
 import requests
 from urllib.request import urlopen
@@ -127,56 +127,7 @@ print("The overall sentiment is %s with an average sentiment value of %.2f" % (o
 #Streamlit Frontend
 #App description
 st.title('Sentiment analysis overview')
-st.caption("This is a Sentiment Analysis on your chosen audio file using AssemblyAI's API")
-
-# Get link from user
-# video_url = st.text_input(label='Earnings call link', value="https://www.youtube.com/watch?v=UA-ISgpgGsk")
-
-# # Save audio locally
-# save_location = save_audio(video_url)
-
-# ## Upload audio to AssemblyAI
-# CHUNK_SIZE = 5242880
-
-# def read_file(filename):
-# 	with open(filename, 'rb') as _file:
-# 		while True:
-# 			data = _file.read(CHUNK_SIZE)
-# 			if not data:
-# 				break
-# 			yield data
-
-# upload_response = requests.post(
-# 	upload_endpoint,
-# 	headers=headers_auth_only, data=read_file(save_location)
-# )
-
-# audio_url = upload_response.json()['upload_url']
-# print('Uploaded to', audio_url)
-
-# ## Start transcription job of audio file
-# data = {
-# 	'audio_url': audio_url,
-# 	'sentiment_analysis': 'True',
-# }
-
-# transcript_response = requests.post(transcript_endpoint, json=data, headers=headers)
-# print(transcript_response)
-
-# transcript_id = transcript_response.json()['id']
-# polling_endpoint = transcript_endpoint + "/" + transcript_id
-
-# print("Transcribing at", polling_endpoint)
-
-# ## Waiting for transcription to be done
-# status = 'submitted'
-# while status != 'completed':
-# 	print('not ready yet')
-# 	sleep(1)
-# 	polling_response = requests.get(polling_endpoint, headers=headers)
-# 	transcript = polling_response.json()['text']
-# 	status = polling_response.json()['status']
-	
+st.caption("This is a Sentiment Analysis on your chosen audio file using AssemblyAI's API")	
 
 # Display transcript
 print('creating transcript')
@@ -185,14 +136,6 @@ st.sidebar.markdown(transcript)
 
 #convert json to dataframe
 sen_df = pd.DataFrame(sentiment_analysis_results)
-
-## Get the title of this video
-# with urlopen(video_url) as url:
-#     s = url.read()
-#     soup = BeautifulSoup(s)
-#     title = soup.title.string
-
-# st.header(title)
 
 #sum sentiment to run calculations
 positive_sum = (sen_df['sentiment'] == 'POSITIVE').sum()
