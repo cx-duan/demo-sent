@@ -24,18 +24,6 @@ def read_file(filename):
             if not data:
                 break
             yield data
-# Function converting milliseconds
-def convertMillis(start_ms):
-    seconds = int((start_ms / 1000) % 60)
-    minutes = int((start_ms / (1000 * 60)) % 60)
-    hours = int((start_ms / (1000 * 60 * 60)) % 24)
-    btn_txt = ''
-    if hours > 0:
-        btn_txt += f'{hours:02d}:{minutes:02d}:{seconds:02d}'
-    else:
-        btn_txt += f'{minutes:02d}:{seconds:02d}'
-    return btn_txt
-
 
 # a function to upload a given file to AssemblyAI's servers
 def upload_file(file, auth_key):
@@ -82,12 +70,31 @@ def poll(polling_endpoint, auth_key):
         time.sleep(10)
         status = get_status(polling_endpoint, auth_key)
 
+# A dictionary mapping sentiment labels to numerical values
 sent_to_num = {
     "POSITIVE": 1,
     "NEUTRAL": 0,
     "NEGATIVE": -1
 }
 
+# Given a dictionary mapping entities to average sentiment values,
+# returns a dictionary mapping each entity to a sentiment label (e.g. "positive", "negative")
+def categorize_sentiment(avg_sent_ent):
+    result = {}
+    for i in avg_sent_ent:
+        sentiment = "neutral"
+        if avg_sent_ent[i] < 0:
+            sentiment = "negative"
+            if avg_sent_ent[i] < -0.5:
+                sentiment = "very negative"
+        elif avg_sent_ent[i] > 0:
+            sentiment = "positive"
+            if avg_sent_ent[i] > 0.5:
+                sentiment = "very positive"
+        result[i] = sentiment
+    return result
+
+# A recursive function that flattens a nested list
 def flatten(S):
     if S == []:
         return S
@@ -103,68 +110,61 @@ def get_sentiment(start, end, entity, sentiment_analysis_results):
         # Add JSON key-value to list if sentiment is between the start and end time specified 
         if int(sentiment['start']) >= start and int(sentiment['end'] <= end):
             sent.append(sentiment)
-        # Extract the sentitment from the key value. Matching two conditions
+    # Extract the sentitment from the key value. Matching two conditions
     for s in sent:
-        #Sent_to_num function to convert sentiment to a number
         ent_arr.append(sent_to_num[s['sentiment']])
-        # Return formatted entity with respective sentiment value 
-    return entity.capitalize(), ent_arr
+    return entity.title(), ent_arr
 
-#Loop to define start and end times. 2000ms buffer. Add 
-sent_ent = {}
-def get_entities(entities):
-	for ent in entities:
-		start = 0
-		end = int(ent['end'] + 2000)
-		if int(ent['start'] - 2000 >= 0):
-			start = int(ent['start'] - 2000)
-	# List to dictionary. Append sentiment values for each key
-		sent = get_sentiment(start, end, ent['text'])
-		if sent[0] in sent_ent:
-			sent_ent[sent[0]].append(sent[1])
-		else:
-			sent_ent[sent[0]] = [sent[1]]
-
+# Given a list of entities and a list of sentiment analysis results,
+# returns a dictionary mapping each entity to its average sentiment value
+def get_entities(entities, sentiment_analysis_results):
+    sent_ent = {}
+#Loop to define start and end times. 2000ms buffer. Add if within these conditions
+    for ent in entities:
+        start = 0
+        end = int(ent['end'] + 2000)
+        if int(ent['start'] - 2000 >= 0):
+            start = int(ent['start'] - 2000)
+# List to dictionary. Append sentiment values for each key
+        sent = get_sentiment(start, end, ent['text'], sentiment_analysis_results)
+        if sent[0] in sent_ent:
+            sent_ent[sent[0]].append(sent[1])
+        else:
+            sent_ent[sent[0]] = [sent[1]]
 # Flatten result and average each value for each key
-avg_sent_ent = {}
-for i in sent_ent:
-    flat = flatten(sent_ent[i])
-    s = sum(flat)
-    l = len(flat)
-    if l > 0:
-        avg = s / l
-        avg_sent_ent[i] = avg
-def categorize_sentiment(avg_sent_ent):
-    result = {}
-    for i in avg_sent_ent:
-        sentiment = "neutral"
-        if avg_sent_ent[i] < 0:
-            sentiment = "negative"
-            if avg_sent_ent[i] < -0.5:
-                sentiment = "very negative"
-        elif avg_sent_ent[i] > 0:
-            sentiment = "positive"
-            if avg_sent_ent[i] < 0.5:
-                sentiment = "very positive"
-        result[i] = sentiment
-    return result
+    avg_sent_ent = {}
+    for i in sent_ent:
+        flat = flatten(sent_ent[i])
+        s = sum(flat)
+        l = len(flat)
+        if l > 0:
+            avg = s / l
+            avg_sent_ent[i] = avg
+    return avg_sent_ent
 
+# Given a list of entities and a list of sentiment analysis results,
+# returns a list of sentences describing the sentiment of each entity
+def entity_sentiment_analysis(entities, sentiment_analysis_results):
+    avg_sent_ent = get_entities(entities, sentiment_analysis_results)
 # Add the sentiment value to the dictionary based on if the average sentiment value is >0, <0, =0
-sent_and_label = {}
-sentences = []
-for i in avg_sent_ent:
-    sentiment_dict = categorize_sentiment({i: avg_sent_ent[i]})
-    sentiment = sentiment_dict[i]
+    sent_and_label = {}
+    sentences = []
+    for i in avg_sent_ent:
+        sentiment_dict = categorize_sentiment({i: avg_sent_ent[i]})
+        sentiment = sentiment_dict[i]
+        sent_and_label[i] = {
+            "sentiment_value": avg_sent_ent[i],
+            "sentiment": sentiment
+        }
+        sentences.append("%s has a %s sentiment" % (i, sentiment))
     
-    sent_and_label[i] = {
-        "sentiment_value": avg_sent_ent[i],
-        "sentiment": sentiment
-    }
-    sentences.append("%s has a %s sentiment" % (i, sentiment))
+    total = sum(avg_sent_ent.values())
+    total_avg_sent = total / len(avg_sent_ent)
+    #Option to get average entity sentiment
+    # # Categorize the overall sentiment
+    # overall_sentiment_dict = categorize_sentiment({"Overall": total_avg_sent})
+    # overall_sentiment = overall_sentiment_dict["Overall"]
+    # # Print the overall sentiment
+    # print("The overall sentiment is %s with an average sentiment value of %.2f" % (overall_sentiment, total_avg_sent))
+    return sentences
 
-total = sum(avg_sent_ent.values())
-# total_avg_sent = total / len(avg_sent_ent)
-
-# Categorize the overall sentiment
-# overall_sentiment_dict = categorize_sentiment({"Overall": total_avg_sent})
-# overall_sentiment = overall_sentiment_dict["Overall"]

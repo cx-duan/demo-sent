@@ -1,13 +1,9 @@
 import streamlit as st
 import pandas as pd
-import json
 import plotly.express as px
 import plotly.graph_objects as go
-import numpy as np
 import util
-from configure import auth_key
 import requests
-from time import sleep
 from PIL import Image
 from pytube import YouTube
 
@@ -29,8 +25,11 @@ while not auth_key:
     st.stop()
 
 # Get YouTube link from user
-# video_url = st.text_input(label= "Paste YouTube URL here (Sample URL Provided)",value="https://www.youtube.com/watch?v=UA-ISgpgGsk")
-video_url = st.text_input(label= "Paste YouTube URL here (Sample URL Provided)",value="https://www.youtube.com/watch?v=SsUNBUe9hPE")
+video_url = st.text_input(label= "Paste YouTube URL here (Sample URL Provided)",value="https://www.youtube.com/watch?v=hF4kap6WvOk")
+# Alternate URL
+# video_url = st.text_input(label= "Paste YouTube URL here (Sample URL Provided)",value="https://www.youtube.com/watch?v=SsUNBUe9hPE")
+# Set progress bar
+youtube_progress_bar = st.progress(0, text="Transcription in progress")
 
 # Set title to YouTube video using metadata
 video_title=(f'{YouTube(video_url).title}')
@@ -38,6 +37,9 @@ st.subheader(video_title)
 st.video(video_url)
 
 polling_endpoint, file = util.transcribe_from_link(video_url, auth_key)
+# Update progress bar
+youtube_progress_bar.progress(40, text="Uploading to AssemblyAI endpoint")
+print('Uploaded')
 
 # Changes status to 'submitted'
 st.session_state['status'] = 'submitted'
@@ -58,7 +60,9 @@ if st.session_state['status'] =='completed':
 
 # Display transcript
 print('Transcript completed')
-st.sidebar.header(video_title, "Transcript")
+youtube_progress_bar.progress(100, text="Completed transcript")
+st.sidebar.title("Transcript")
+st.sidebar.header(video_title)
 st.sidebar.markdown(transcript)
 
 sen_df = pd.DataFrame(sentiment_analysis_results)
@@ -150,4 +154,9 @@ fig.update_layout(
 )
 st.plotly_chart(fig)
 
+#list sentiment list as bullet points
+sentences = util.entity_sentiment_analysis(entities, sentiment_analysis_results)
+with st.expander("Entity Sentiment List",True):
+    for i in sentences:
+        st.write("- " + i)
 
